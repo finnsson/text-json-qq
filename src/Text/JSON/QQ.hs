@@ -9,6 +9,7 @@ import Language.Haskell.TH.Quote
 -- import Language.Haskell.Meta.Parse
 
 import Data.Data
+import Data.Maybe
 
 import Text.JSON
 import Text.JSON.Generic
@@ -61,11 +62,14 @@ instance ToExp JsonValue where
   toExp (JsonArray arr) =
     AppE (ConE $ mkName "Text.JSON.Types.JSArray") (ListE $ map toExp arr)
 
-  toExp (JsonNumber rat) =
-    AppE (AppE (ConE $ mkName "Text.JSON.Types.JSRational") (ConE $ mkName "True")) (InfixE (Just (LitE (IntegerL $ rat))) (VarE $ mkName "Data.Ratio.%") (Just (LitE (IntegerL $ 1))))
+  toExp (JsonNumber b rat) =
+    AppE (AppE (ConE $ mkName "Text.JSON.Types.JSRational") (ConE $ mkName (if b then "True" else "False"))) (InfixE (Just (LitE (IntegerL $ numerator rat))) (VarE $ mkName "Data.Ratio.%") (Just (LitE (IntegerL $ denominator rat))))
     
   toExp (JsonVar v) =
     AppE (VarE $ mkName "Text.JSON.QQ.toJsonOrId") (VarE $ mkName v)
+
+  toExp (JsonBool b) =
+    AppE (ConE $ mkName "Text.JSON.Types.JSBool") (ConE $ mkName (if b then "True" else "False"))
 
 class ToJsonOrId a where
   toJsonOrId :: a -> JSValue
@@ -85,10 +89,11 @@ instance ToJsonOrId Integer where
 data JsonValue =
   JsonNull
   | JsonString String
-  | JsonNumber Integer
+  | JsonNumber Bool Rational
   | JsonObject [(String,JsonValue)]
   | JsonArray [JsonValue]
   | JsonVar String
+  | JsonBool Bool
 
 ------
 -- Grammar
@@ -102,9 +107,19 @@ data QQJsCode =
 jpValue :: CharParser st JsonValue
 jpValue = do
   spaces
-  res <- try jpVar <|> jpNull <|> jpString <|> jpNumber <|> jpObject <|> jpArray
+  res <- jpTrue <|> jpFalse <|> try jpVar <|> jpNull <|> jpString <|> jpObject <|> try jpNumber  <|> jpArray
   spaces
   return res
+
+jpTrue :: CharParser st JsonValue
+jpTrue = do
+  string "true"
+  return $ JsonBool True
+
+jpFalse :: CharParser st JsonValue
+jpFalse = do
+  string "false"
+  return $ JsonBool False
 
 jpVar :: CharParser st JsonValue
 jpVar = do
@@ -121,14 +136,15 @@ jpNull = do
 jpString :: CharParser st JsonValue 
 jpString = do
   char '"'
-  sym <- symbol
+  sym <- try $ option [""] $ many chars
   char '"'
-  return $ JsonString sym 
+  return $ JsonString $ concat sym 
 
 jpNumber :: CharParser st JsonValue 
 jpNumber = do
-  num <- many1 digit
-  return $ JsonNumber (read num :: Integer)
+  isMinus <- optionMaybe (char '-')
+  val <- float
+  return $ JsonNumber (not $ isJust isMinus) (toRational val)
 
 jpObject :: CharParser st JsonValue
 jpObject = do
@@ -162,7 +178,47 @@ jpArray = do
 -------
 -- helpers for parser/grammar
 
+float :: CharParser st Double 
+float = do
+  d <- many1 digit
+  o <- option "" withDot
+  e <- option "" withE
+  return $ (read $ d ++ o ++ e :: Double)
+
+withE = do
+  e <- char 'e' <|> char 'E'
+  plusMinus <- option "" (string "+" <|> string "-")
+  d <- many digit
+  return $ e : plusMinus ++ d 
+
+withDot = do
+  o <- char '.'
+  d <- many digit
+  return $ o:d
+
 symbol :: CharParser st String
 symbol = many1 (noneOf "\\ \":;><") -- alphaNum -- should be replaced!
 
 commaSep p  = p `sepBy` (char ',')
+
+chars :: CharParser st String
+chars = do
+   try (string "\\\"")
+   <|> try (string "\\/")
+   <|> try (string "\\\\")
+   <|> try (string "\\b")
+   <|> try (string "\\f")
+   <|> try (string "\\n")
+   <|> try (string "\\r")
+   <|> try (string "\\t")
+   <|> try (unicodeChars)
+   <|> many1 (noneOf "\\\"")
+
+unicodeChars :: CharParser st String
+unicodeChars = do
+  u <- string "\\u"
+  d1 <- hexDigit
+  d2 <- hexDigit
+  d3 <- hexDigit
+  d4 <- hexDigit
+  return $ u ++ [d1] ++ [d2] ++ [d3] ++ [d4]
