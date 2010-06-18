@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fglasgow-exts -XTemplateHaskell -XQuasiQuotes #-}
 module Text.JSON.QQ (
   jsonQQ,
+  ToJsonOrId (..)
 ) where
 
 import Language.Haskell.TH
@@ -30,7 +31,7 @@ jsonExp txt =
     Right val -> return $ toExp val -- test -- dataToExpQ undefined test -- [| test |] -- [| toJSObject [("a","b")] |] --
   where
     parsed' = parse jpValue "txt" txt
-    test = JSObject $ toJSObject [("a",JSNull)]
+    -- test = JSObject $ toJSObject [("a",JSNull)]
 
 jsonPat :: String -> PatQ
 jsonPat s = undefined
@@ -43,68 +44,102 @@ jsonPat s = undefined
 class ToExp a where
   toExp :: a -> Exp
 
-instance ToExp JSValue where
-  toExp (JSString str) = 
-    AppE (ConE $ mkName "Text.JSON.Types.JSString") (AppE (VarE $ mkName "Text.JSON.Types.toJSString") (LitE (StringL $ fromJSString str)))
+instance ToExp JsonValue where
+  toExp (JsonString str) = 
+    AppE (ConE $ mkName "Text.JSON.Types.JSString") (AppE (VarE $ mkName "Text.JSON.Types.toJSString") (LitE (StringL $ str)))
 
-  toExp (JSNull) = ConE $ mkName "Text.JSON.Types.JSNull"
+  toExp (JsonNull) = ConE $ mkName "Text.JSON.Types.JSNull"
 
-  toExp (JSObject objs) = 
+  toExp (JsonObject objs) = 
     AppE (ConE $ mkName "Text.JSON.Types.JSObject") (AppE (VarE $ mkName "Text.JSON.Types.toJSObject") (ListE $ jsList ))
     where
       jsList :: [Exp] -- [(String,JSValue)]
-      jsList = map objs2list (fromJSObject objs)
-      objs2list :: (String,JSValue) -> Exp
+      jsList = map objs2list (objs)
+      objs2list :: (String,JsonValue) -> Exp
       objs2list (k,v) = TupE [LitE (StringL k), toExp v]
 
-  toExp (JSArray arr) =
+  toExp (JsonArray arr) =
     AppE (ConE $ mkName "Text.JSON.Types.JSArray") (ListE $ map toExp arr)
 
-  toExp (JSRational b rat) =
-    AppE (AppE (ConE $ mkName "Text.JSON.Types.JSRational") (ConE $ mkName "True")) (InfixE (Just (LitE (IntegerL $ numerator rat))) (VarE $ mkName "Data.Ratio.%") (Just (LitE (IntegerL $ denominator rat))))
+  toExp (JsonNumber rat) =
+    AppE (AppE (ConE $ mkName "Text.JSON.Types.JSRational") (ConE $ mkName "True")) (InfixE (Just (LitE (IntegerL $ rat))) (VarE $ mkName "Data.Ratio.%") (Just (LitE (IntegerL $ 1))))
     
+  toExp (JsonVar v) =
+    AppE (VarE $ mkName "Text.JSON.QQ.toJsonOrId") (VarE $ mkName v)
+
+class ToJsonOrId a where
+  toJsonOrId :: a -> JSValue
+
+instance ToJsonOrId JSValue where
+  toJsonOrId = id
+
+instance ToJsonOrId String where
+  toJsonOrId txt = Text.JSON.JSString $ Text.JSON.toJSString txt
+
+instance ToJsonOrId Integer where
+  toJsonOrId int = Text.JSON.JSRational True (int % 1)
+
+-------
+-- Internal representation
+
+data JsonValue =
+  JsonNull
+  | JsonString String
+  | JsonNumber Integer
+  | JsonObject [(String,JsonValue)]
+  | JsonArray [JsonValue]
+  | JsonVar String
 
 ------
 -- Grammar
 -- jp = json parsec
 -----
 
+data QQJsCode =
+  QQjs JSValue
+  | QQcode String
 
-
-jpValue :: CharParser st JSValue
+jpValue :: CharParser st JsonValue
 jpValue = do
   spaces
-  res <- jpNull <|> jpString <|> jpNumber <|> jpObject <|> jpArray
+  res <- try jpVar <|> jpNull <|> jpString <|> jpNumber <|> jpObject <|> jpArray
   spaces
   return res
 
-jpNull :: CharParser st JSValue
+jpVar :: CharParser st JsonValue
+jpVar = do
+  string "<<"
+  sym <- symbol
+  string ">>"
+  return $ JsonVar sym
+
+jpNull :: CharParser st JsonValue
 jpNull = do
   string "null"
-  return $ JSNull
+  return $ JsonNull
 
-jpString :: CharParser st JSValue 
+jpString :: CharParser st JsonValue 
 jpString = do
   char '"'
   sym <- symbol
   char '"'
-  return $ JSString $ toJSString sym 
+  return $ JsonString sym 
 
-jpNumber :: CharParser st JSValue 
+jpNumber :: CharParser st JsonValue 
 jpNumber = do
   num <- many1 digit
-  return $ JSRational True ((read num :: Integer) % 1)
+  return $ JsonNumber (read num :: Integer)
 
-jpObject :: CharParser st JSValue
+jpObject :: CharParser st JsonValue
 jpObject = do
   char '{'
   spaces
   list <- commaSep jpHash
   spaces
   char '}'
-  return $ JSObject $ toJSObject list
+  return $ JsonObject $ list
   where
-    jpHash :: CharParser st (String,JSValue)
+    jpHash :: CharParser st (String,JsonValue)
     jpHash = do
       spaces
       name <- symbol
@@ -115,19 +150,19 @@ jpObject = do
       spaces
       return (name,value)
 
-jpArray :: CharParser st JSValue
+jpArray :: CharParser st JsonValue
 jpArray = do
   char '['
   spaces
   list <- commaSep jpValue
   spaces
   char ']'
-  return $ JSArray list
+  return $ JsonArray list
 
 -------
 -- helpers for parser/grammar
 
 symbol :: CharParser st String
-symbol = many1 (noneOf "\\ \":;") -- alphaNum -- should be replaced!
+symbol = many1 (noneOf "\\ \":;><") -- alphaNum -- should be replaced!
 
 commaSep p  = p `sepBy` (char ',')

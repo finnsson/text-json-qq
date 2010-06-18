@@ -23,8 +23,6 @@ main = defaultMain [tests]
 
 tests = $testGroupGenerator
 
-case_apa = 3 @=? 3
-
 case_get_QQ_to_compile = do
   let actual = [$jsonQQ| {foo: "bar"} |]
       expected = JSObject $ toJSObject [("foo", JSString $ toJSString "bar")]
@@ -33,4 +31,10 @@ case_get_QQ_to_compile = do
 case_arrays = do
   let actual = [$jsonQQ| [null,{foo: 42}] |]
       expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational True (42 % 1))] ]
+  expected @=? actual
+
+case_code = do
+  let actual = [$jsonQQ| [null,{foo: <<x>>}] |]
+      expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational True (42 % 1))] ]
+      x = 42 :: Integer
   expected @=? actual

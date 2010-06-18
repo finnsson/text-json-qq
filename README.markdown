@@ -15,3 +15,11 @@ where it is important that
 
 * you got no space in `[$jsonQQ|` and
 * no additional code after `|]`.
+
+The quasiquatation can only bind to variables like
+
+    myCode = [$jsonQQ | {age: <<age>>, name: <<name>>} |]
+     where age = 34 :: Integer
+           name = "Pelle"
+
+where a function `toJsonOrId` (that is also exported by `Text.JSON.QQ`) will be called on `age` and `name` runtime.
