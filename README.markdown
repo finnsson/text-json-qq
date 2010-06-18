@@ -16,7 +16,7 @@ where it is important that
 * you got no space in `[$jsonQQ|` and
 * no additional code after `|]`.
 
-The quasiquatation can only bind to variables like
+The quasiquatation can also bind to variables like
 
     myCode = [$jsonQQ | {age: <<age>>, name: <<name>>} |]
      where age = 34 :: Integer

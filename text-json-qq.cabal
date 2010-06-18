@@ -10,10 +10,20 @@ Name:                text-json-qq
 Version:             0.1
 
 -- A short (one-line) description of the package.
-Synopsis:            Quasiquatation for json.
+Synopsis:            Json Quasiquatation for Haskell.
 
 -- A longer description of the package.
--- Description:         
+Description:  
+    @text-json-qq@ provides json quasiquatation for Haskell.
+    .
+    This package expose the function @jsonQQ@ that compile time converts json code into a @Text.JSON.JSValue@.
+    @jsonQQ@ got the signature
+    .
+    > jsonQQ :: QuasiQuoter.
+    .
+    Consult documentation in the module @Text.JSON.QQ@.
+
+
 
 -- URL for the project homepage or repository.
 Homepage:            http://github.com/finnsson/text-json-qq
@@ -22,7 +32,7 @@ Homepage:            http://github.com/finnsson/text-json-qq
 License:             OtherLicense
 
 -- The file containing the license text.
-License-file:        LICENSE
+License-file:        COPYING.txt
 
 -- The package author(s).
 Author:              Oscar Finnsson
@@ -45,13 +55,16 @@ Build-type:          Simple
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.2
 
+build-depends: base >= 4.2 && < 5, json, parsec >= 2 && < 3, template-haskell
 
-Library
+hs-source-dirs: src
+
+-- Library
   -- Modules exported by the library.
-  -- Exposed-modules:     
+exposed-modules: Text.JSON.QQ
   
   -- Packages needed in order to build this package.
-  -- Build-depends:       
+  -- build-depends:       base >= 4 < 5, json
   
   -- Modules not exported by this package.
   -- Other-modules:       
