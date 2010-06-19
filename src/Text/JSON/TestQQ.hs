@@ -29,13 +29,13 @@ case_get_QQ_to_compile = do
   expected @=? actual
 
 case_arrays = do
-  let actual = [$jsonQQ| [null,{foo: 42}] |]
-      expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational True (42 % 1))] ]
+  let actual = [$jsonQQ| [null,{foo: -42}] |]
+      expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational False (-42 % 1))] ]
   expected @=? actual
 
 case_code = do
   let actual = [$jsonQQ| [null,{foo: <<x>>}] |]
-      expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational True (42 % 1))] ]
+      expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational False (42 % 1))] ]
       x = 42 :: Integer
   expected @=? actual
 

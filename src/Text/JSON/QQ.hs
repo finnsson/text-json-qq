@@ -95,6 +95,9 @@ instance ToExp JsonValue where
   toExp (JsonBool b) =
     AppE (ConE $ mkName "Text.JSON.Types.JSBool") (ConE $ mkName (if b then "True" else "False"))
 
+-------
+-- ToJsonOrId
+
 class ToJsonOrId a where
   toJsonOrId :: a -> JSValue
 
@@ -105,7 +108,10 @@ instance ToJsonOrId String where
   toJsonOrId txt = Text.JSON.JSString $ Text.JSON.toJSString txt
 
 instance ToJsonOrId Integer where
-  toJsonOrId int = Text.JSON.JSRational True (int % 1)
+  toJsonOrId int = Text.JSON.JSRational False (int % 1)
+
+instance ToJsonOrId Rational where
+  toJsonOrId rat = Text.JSON.JSRational False rat
 
 -------
 -- Internal representation
@@ -166,9 +172,9 @@ jpString = do
 
 jpNumber :: CharParser st JsonValue 
 jpNumber = do
-  isMinus <- optionMaybe (char '-')
+  -- isMinus <- optionMaybe (char '-')
   val <- float
-  return $ JsonNumber (not $ isJust isMinus) (toRational val)
+  return $ JsonNumber False (toRational val)
 
 jpObject :: CharParser st JsonValue
 jpObject = do
@@ -204,10 +210,11 @@ jpArray = do
 
 float :: CharParser st Double 
 float = do
+  isMinus <- option ' ' (char '-')
   d <- many1 digit
   o <- option "" withDot
   e <- option "" withE
-  return $ (read $ d ++ o ++ e :: Double)
+  return $ (read $ isMinus : d ++ o ++ e :: Double)
 
 withE = do
   e <- char 'e' <|> char 'E'
