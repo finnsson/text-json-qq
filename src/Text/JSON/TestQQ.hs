@@ -12,6 +12,7 @@ import Test.Framework (defaultMain)
 
 import Text.JSON
 import Text.JSON.Types
+import Text.JSON.Generic
 
 import Data.Ratio
 
@@ -44,6 +45,30 @@ case_true = do
       expected = JSArray [JSBool True, JSBool False, JSNull]
   expected @=? actual
 
+case_json_var = do
+  let actual = [$jsonQQ| [null,{foo: <<<x>>>}] |]
+      expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational False (42 % 1))] ]
+      x = toJSON ( 42 :: Integer)
+  expected @=? actual
+
+case_foo = do
+  let actual = [$jsonQQ| <<foo>> |]
+      expected = JSObject $ toJSObject [("age", JSRational False (42 % 1) ) ]
+      foo = Bar 42
+  expected @=? actual
+
+case_quoted_name = do
+  let actual = [$jsonQQ| {"foo": "bar"} |]
+      expected = JSObject $ toJSObject [("foo", JSString $ toJSString "bar")]
+      foo = "zoo"
+  expected @=? actual
+
+case_var_name = do
+  let actual = [$jsonQQ| {$foo: "bar"} |]
+      expected = JSObject $ toJSObject [("zoo", JSString $ toJSString "bar")]
+      foo = "zoo"
+  expected @=? actual
+
 case_multiline = do
   let actual =
         [$jsonQQ|
@@ -52,3 +77,8 @@ case_multiline = do
          |]
       expected = JSArray [JSObject $ toJSObject [("user", JSString $ toJSString "Pelle")], JSObject $ toJSObject [ ("user", JSString $ toJSString "Arne")] ]
   expected @=? actual
+
+-- Data types
+
+data Foo = Bar { age :: Integer}
+  deriving (Eq, Show, Typeable, Data)
