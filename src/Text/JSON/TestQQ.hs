@@ -43,3 +43,12 @@ case_true = do
   let actual = [$jsonQQ| [true,false,null] |]
       expected = JSArray [JSBool True, JSBool False, JSNull]
   expected @=? actual
+
+case_multiline = do
+  let actual =
+        [$jsonQQ|
+          [{user: "Pelle"},
+           {user: "Arne"}]
+         |]
+      expected = JSArray [JSObject $ toJSObject [("user", JSString $ toJSString "Pelle")], JSObject $ toJSObject [ ("user", JSString $ toJSString "Arne")] ]
+  expected @=? actual
