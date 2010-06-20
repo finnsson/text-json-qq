@@ -58,10 +58,9 @@ jsonExp :: String -> ExpQ
 jsonExp txt =
   case parsed' of 
     Left err -> error $ "Error in jsonExp: " ++ show err
-    Right val -> return $ toExp val -- test -- dataToExpQ undefined test -- [| test |] -- [| toJSObject [("a","b")] |] --
+    Right val -> return $ toExp val
   where
     parsed' = parse jpValue "txt" txt
-    -- test = JSObject $ toJSObject [("a",JSNull)]
 
 jsonPat :: String -> PatQ
 jsonPat s = undefined
@@ -76,12 +75,12 @@ class ToExp a where
 
 instance ToExp JsonValue where
   toExp (JsonString str) = 
-    AppE (ConE $ mkName "Text.JSON.Types.JSString") (AppE (VarE $ mkName "Text.JSON.Types.toJSString") (LitE (StringL $ str)))
+    AppE (ConE $ mkName "Text.JSON.JSString") (AppE (VarE $ mkName "Text.JSON.toJSString") (LitE (StringL $ str)))
 
   toExp (JsonNull) = ConE $ mkName "Text.JSON.Types.JSNull"
 
   toExp (JsonObject objs) = 
-    AppE (ConE $ mkName "Text.JSON.Types.JSObject") (AppE (VarE $ mkName "Text.JSON.Types.toJSObject") (ListE $ jsList ))
+    AppE (ConE $ mkName "Text.JSON.JSObject") (AppE (VarE $ mkName "Text.JSON.toJSObject") (ListE $ jsList ))
     where
       jsList :: [Exp] -- [(String,JSValue)]
       jsList = map objs2list (objs)
@@ -90,10 +89,10 @@ instance ToExp JsonValue where
       objs2list (HashVarKey k,v) = TupE [VarE $ mkName k, toExp v]
 
   toExp (JsonArray arr) =
-    AppE (ConE $ mkName "Text.JSON.Types.JSArray") (ListE $ map toExp arr)
+    AppE (ConE $ mkName "Text.JSON.JSArray") (ListE $ map toExp arr)
 
   toExp (JsonNumber b rat) =
-    AppE (AppE (ConE $ mkName "Text.JSON.Types.JSRational") (ConE $ mkName (if b then "True" else "False"))) (InfixE (Just (LitE (IntegerL $ numerator rat))) (VarE $ mkName "Data.Ratio.%") (Just (LitE (IntegerL $ denominator rat))))
+    AppE (AppE (ConE $ mkName "Text.JSON.JSRational") (ConE $ mkName (if b then "True" else "False"))) (InfixE (Just (LitE (IntegerL $ numerator rat))) (VarE $ mkName "Data.Ratio.%") (Just (LitE (IntegerL $ denominator rat))))
     
   toExp (JsonVar v) =
     AppE (VarE $ mkName "Text.JSON.Generic.toJSON") (VarE $ mkName v)
@@ -102,7 +101,7 @@ instance ToExp JsonValue where
     VarE $ mkName v
 
   toExp (JsonBool b) =
-    AppE (ConE $ mkName "Text.JSON.Types.JSBool") (ConE $ mkName (if b then "True" else "False"))
+    AppE (ConE $ mkName "Text.JSON.JSBool") (ConE $ mkName (if b then "True" else "False"))
 
 -------
 -- ToJsonOrId
@@ -136,68 +135,59 @@ data HashKey =
 -- jp = json parsec
 -----
 
+(=>>) :: Monad m => m a -> b -> m b
+x =>> y = x >> return y
+
+
+(>>>=) :: Monad m => m a -> (a -> b) -> m b
+x >>>= y = x >>= return . y
+
+type JsonParser = Parser JsonValue
+
 data QQJsCode =
   QQjs JSValue
   | QQcode String
 
-jpValue :: CharParser st JsonValue
+jpValue :: JsonParser
 jpValue = do
   spaces
-  res <- jpTrue <|> jpFalse <|> try jpVar <|> try jpIdVar <|> jpNull <|> jpString <|> jpObject <|> try jpNumber  <|> jpArray
+  res <- jpTrue <|> jpFalse <|> try jpVar <|> try jpIdVar <|> jpNull <|> jpString <|> jpObject <|> jpNumber  <|> jpArray
   spaces
   return res
 
-jpTrue :: CharParser st JsonValue
-jpTrue = do
-  string "true"
-  return $ JsonBool True
+jpTrue :: JsonParser
+jpTrue = jpBool "true" True
 
-jpFalse :: CharParser st JsonValue
-jpFalse = do
-  string "false"
-  return $ JsonBool False
+jpFalse :: JsonParser
+jpFalse = jpBool "false" False
 
-jpIdVar :: CharParser st JsonValue
-jpIdVar = do
-  string "<<<"
-  sym <- symbol
-  string ">>>"
-  return $ JsonIdVar sym
+jpBool :: String -> Bool -> JsonParser
+jpBool txt b = string txt =>> JsonBool b
 
-jpVar :: CharParser st JsonValue
-jpVar = do
-  string "<<"
-  sym <- symbol
-  string ">>"
-  return $ JsonVar sym
+jpIdVar :: JsonParser
+jpIdVar = between (string "<<<") (string ">>>") symbol >>>= JsonIdVar
 
-jpNull :: CharParser st JsonValue
+jpVar :: JsonParser
+jpVar = between (string "<<") (string ">>") symbol >>>= JsonVar
+
+jpNull :: JsonParser
 jpNull = do
-  string "null"
-  return $ JsonNull
+  string "null" =>> JsonNull
 
-jpString :: CharParser st JsonValue 
-jpString = do
-  char '"'
-  sym <- try $ option [""] $ many chars
-  char '"'
-  return $ JsonString $ concat sym 
+jpString :: JsonParser 
+jpString = between (char '"') (char '"') (option [""] $ many chars) >>= return . JsonString . concat -- do
 
-jpNumber :: CharParser st JsonValue 
+jpNumber :: JsonParser 
 jpNumber = do
   val <- float
   return $ JsonNumber False (toRational val)
 
-jpObject :: CharParser st JsonValue
+jpObject :: JsonParser
 jpObject = do
-  char '{'
-  spaces
-  list <- commaSep jpHash
-  spaces
-  char '}'
+  list <- between (char '{') (char '}') (commaSep jpHash)
   return $ JsonObject $ list
   where
-    jpHash :: CharParser st (HashKey,JsonValue) -- (String,JsonValue)
+    jpHash :: CharParser () (HashKey,JsonValue) -- (String,JsonValue)
     jpHash = do
       spaces
       name <- varKey <|> symbolKey <|> quotedStringKey
@@ -208,30 +198,20 @@ jpObject = do
       spaces
       return (name,value)
 
-symbolKey :: CharParser st HashKey
-symbolKey = do
-  sym <- symbol
-  return $ HashStringKey sym
+symbolKey :: CharParser () HashKey
+symbolKey = symbol >>>= HashStringKey
 
-quotedStringKey :: CharParser st HashKey
-quotedStringKey = do
-  quo <- quotedString
-  return $ HashStringKey quo
+quotedStringKey :: CharParser () HashKey
+quotedStringKey = quotedString >>>= HashStringKey
 
-varKey :: CharParser st HashKey
+varKey :: CharParser () HashKey
 varKey = do
   char '$'
   sym <- symbol
   return $ HashVarKey sym
 
-jpArray :: CharParser st JsonValue
-jpArray = do
-  char '['
-  spaces
-  list <- commaSep jpValue
-  spaces
-  char ']'
-  return $ JsonArray list
+jpArray :: CharParser () JsonValue
+jpArray = between (char '[') (char ']') (commaSep jpValue) >>>= JsonArray
 
 -------
 -- helpers for parser/grammar
@@ -255,26 +235,15 @@ withDot = do
   d <- many digit
   return $ o:d
 
--- jsonSymbol :: CharParser st String
--- jsonSymbol = do
---   symbol <|> symbol'
---   where
---     symbol' = do
---       char '"'
+quotedString :: CharParser () String
+quotedString = between (char '"') (char '"') (option [""] $ many chars) >>>= concat
 
-quotedString :: CharParser st String
-quotedString = do
-  char '"'
-  sym <- try $ option [""] $ many chars
-  char '"'
-  return $ concat sym 
-
-symbol :: CharParser st String
-symbol = many1 (noneOf "\\ \":;><") -- alphaNum -- should be replaced!
+symbol :: CharParser () String
+symbol = many1 (noneOf "\\ \":;><$")
 
 commaSep p  = p `sepBy` (char ',')
 
-chars :: CharParser st String
+chars :: CharParser () String
 chars = do
    try (string "\\\"")
    <|> try (string "\\/")
@@ -287,7 +256,7 @@ chars = do
    <|> try (unicodeChars)
    <|> many1 (noneOf "\\\"")
 
-unicodeChars :: CharParser st String
+unicodeChars :: CharParser () String
 unicodeChars = do
   u <- string "\\u"
   d1 <- hexDigit

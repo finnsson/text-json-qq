@@ -72,7 +72,9 @@ case_var_name = do
 case_multiline = do
   let actual =
         [$jsonQQ|
-          [{user: "Pelle"},
+          [   {
+            user: 
+              "Pelle"},
            {user: "Arne"}]
          |]
       expected = JSArray [JSObject $ toJSObject [("user", JSString $ toJSString "Pelle")], JSObject $ toJSObject [ ("user", JSString $ toJSString "Arne")] ]
