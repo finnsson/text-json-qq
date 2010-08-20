@@ -17,15 +17,21 @@
 --    
 --    The quasiquatation can also bind to variables like
 --    
---    > myCode = [$jsonQQ| {age: <<age>>, name: <<name>>} |]
+--    > myCode = [$jsonQQ| {age: <|age|>, name: <|name|>} |]
 --    > where age = 34 :: Integer
 --    >       name = "Pelle"
 --    
 --    where the function  @toJSON@ will be called on @age@ and @name@ runtime.
+--
+--    You can also insert Haskell code: 
+--
+--    > myCode = [$jsonQQ| {age: <|age + 34 :: Integer|>, name: <|map toUpper name|>} |]
+--    > where age = 34 :: Integer
+--    >       name = "Pelle"
 --    
 --    You can use a similar syntax if you want to insert a value of type JSValue like
 --    
---    > myCode = [$jsonQQ| {"age": <<<age>>>} |]
+--    > myCode = [$jsonQQ| {"age": <<age>>} |]
 --    
 --    If you want to replace the name of the key in a hash you'll use the $-syntax:
 --    
@@ -49,6 +55,9 @@ import Text.JSON.Generic
 import Data.Ratio
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Error
+-- import Text.Parsec.Perm
+
+import Language.Haskell.Meta.Parse
 
 jsonQQ :: QuasiQuoter
 jsonQQ = QuasiQuoter jsonExp jsonPat
@@ -94,14 +103,14 @@ instance ToExp JsonValue where
   toExp (JsonNumber b rat) =
     AppE (AppE (ConE $ mkName "Text.JSON.JSRational") (ConE $ mkName (if b then "True" else "False"))) (InfixE (Just (LitE (IntegerL $ numerator rat))) (VarE $ mkName "Data.Ratio.%") (Just (LitE (IntegerL $ denominator rat))))
     
-  toExp (JsonVar v) =
-    AppE (VarE $ mkName "Text.JSON.Generic.toJSON") (VarE $ mkName v)
-
   toExp (JsonIdVar v) =
     VarE $ mkName v
 
   toExp (JsonBool b) =
     AppE (ConE $ mkName "Text.JSON.JSBool") (ConE $ mkName (if b then "True" else "False"))
+
+  toExp (JsonCode exp) =
+    AppE (VarE $ mkName "Text.JSON.Generic.toJSON") exp
 
 -------
 -- ToJsonOrId
@@ -118,17 +127,13 @@ data JsonValue =
   | JsonNumber Bool Rational
   | JsonObject [(HashKey,JsonValue)] -- [(String,JsonValue)]
   | JsonArray [JsonValue]
-  | JsonVar String
   | JsonIdVar String
   | JsonBool Bool
+  | JsonCode Exp
 
 data HashKey =
   HashVarKey String
   | HashStringKey String
-
--- data JsonHashPair =
---   JsonStringPair String JsonValue
---   | JsonVarPair String JsonValue
 
 ------
 -- Grammar
@@ -151,7 +156,7 @@ data QQJsCode =
 jpValue :: JsonParser
 jpValue = do
   spaces
-  res <- jpTrue <|> jpFalse <|> try jpVar <|> try jpIdVar <|> jpNull <|> jpString <|> jpObject <|> jpNumber  <|> jpArray
+  res <- jpTrue <|> jpFalse <|> try jpIdVar <|> jpNull <|> jpString <|> jpObject <|> jpNumber  <|> jpArray <|> jpCode
   spaces
   return res
 
@@ -164,11 +169,23 @@ jpFalse = jpBool "false" False
 jpBool :: String -> Bool -> JsonParser
 jpBool txt b = string txt =>> JsonBool b
 
-jpIdVar :: JsonParser
-jpIdVar = between (string "<<<") (string ">>>") symbol >>>= JsonIdVar
+jpCode :: JsonParser
+jpCode = do
+  string "<|"
+  parseExp' >>>= JsonCode
+  where
+    parseExp' = do
+      str <- untilString
+      case (parseExp str) of
+        Left l -> fail l
+        Right r -> return r
 
-jpVar :: JsonParser
-jpVar = between (string "<<") (string ">>") symbol >>>= JsonVar
+
+
+
+jpIdVar :: JsonParser
+jpIdVar = between (string "<<") (string ">>") symbol >>>= JsonIdVar
+
 
 jpNull :: JsonParser
 jpNull = do
@@ -215,6 +232,19 @@ jpArray = between (char '[') (char ']') (commaSep jpValue) >>>= JsonArray
 
 -------
 -- helpers for parser/grammar
+
+untilString :: Parser String
+untilString = do
+      n0 <- option "" $ many1 (noneOf "|")
+      char '|'
+      n1 <- option "" $ many1 (noneOf ">")
+      char '>'
+      if not $ null n1
+        then do n2 <- untilString
+                return $ concat [n0,n1,n2]
+        else return $ concat [n0,n1]
+    
+
 
 float :: CharParser st Double 
 float = do

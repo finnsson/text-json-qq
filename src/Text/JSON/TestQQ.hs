@@ -16,6 +16,8 @@ import Text.JSON.Generic
 
 import Data.Ratio
 
+import Data.Char
+
 -- import Data.Ratio
 
 import Language.Haskell.TH 
@@ -35,7 +37,7 @@ case_arrays = do
   expected @=? actual
 
 case_code = do
-  let actual = [$jsonQQ| [null,{foo: <<x>>}] |]
+  let actual = [$jsonQQ| [null,{foo: <|x|>}] |]
       expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational False (42 % 1))] ]
       x = 42 :: Integer
   expected @=? actual
@@ -46,13 +48,13 @@ case_true = do
   expected @=? actual
 
 case_json_var = do
-  let actual = [$jsonQQ| [null,{foo: <<<x>>>}] |]
+  let actual = [$jsonQQ| [null,{foo: <<x>>}] |]
       expected = JSArray [JSNull, JSObject $ toJSObject [("foo", JSRational False (42 % 1))] ]
       x = toJSON ( 42 :: Integer)
   expected @=? actual
 
 case_foo = do
-  let actual = [$jsonQQ| <<foo>> |]
+  let actual = [$jsonQQ| <|foo|> |]
       expected = JSObject $ toJSObject [("age", JSRational False (42 % 1) ) ]
       foo = Bar 42
   expected @=? actual
@@ -78,6 +80,25 @@ case_multiline = do
            {user: "Arne"}]
          |]
       expected = JSArray [JSObject $ toJSObject [("user", JSString $ toJSString "Pelle")], JSObject $ toJSObject [ ("user", JSString $ toJSString "Arne")] ]
+  expected @=? actual
+
+case_simple_code = do
+  let actual = [$jsonQQ| { foo: <| foo |> } |]
+      expected = JSObject $ toJSObject [("foo", JSString $ toJSString "zoo")]
+      foo = "zoo"
+  expected @=? actual
+
+case_semi_advanced_code = do
+  let actual = [$jsonQQ| { foo: <| foo + 45 |> } |]
+      expected = JSObject $ toJSObject [("foo", JSRational False (133 % 1))]
+      foo = 88 :: Integer
+  expected @=? actual
+
+
+case_semi_advanced_char = do
+  let actual = [$jsonQQ| { name: <| map toUpper name |> } |]
+      expected = JSObject $ toJSObject [("name", JSString $ toJSString "PELLE")]
+      name = "Pelle" 
   expected @=? actual
 
 -- Data types
