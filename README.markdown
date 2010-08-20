@@ -18,8 +18,12 @@ where it is important that
 
 The quasiquatation can also bind to variables like
 
-    myCode = [$jsonQQ | {age: <<age>>, name: <<name>>} |]
+    myCode = [$jsonQQ | {age: <| age |>, name: <| name |>} |]
      where age = 34 :: Integer
            name = "Pelle"
 
-where a function `toJsonOrId` (that is also exported by `Text.JSON.QQ`) will be called on `age` and `name` runtime.
+or contain Haskell code like
+
+    myCode = [$jsonQQ | {age: <| age + 42 :: Integer |>, name: <| map toUpper name |>} |]
+     where age = 34 :: Integer
+           name = "Pelle"
