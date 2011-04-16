@@ -60,7 +60,7 @@ import Text.ParserCombinators.Parsec.Error
 import Language.Haskell.Meta.Parse
 
 jsonQQ :: QuasiQuoter
-jsonQQ = QuasiQuoter jsonExp jsonPat
+jsonQQ = QuasiQuoter { quoteExp = jsonExp, quotePat = jsonPat}
 
 
 jsonExp :: String -> ExpQ
