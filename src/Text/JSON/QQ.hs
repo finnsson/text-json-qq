@@ -7,17 +7,17 @@
 --    
 --    and is used like
 --    
---    > myCode = [$jsonQQ| {age: 23, name: "Pelle", likes: ["mac","Haskell"] } |]
+--    > myCode = [jsonQQ| {age: 23, name: "Pelle", likes: ["mac","Haskell"] } |]
 --    
 --    where it is important that
 --    
---    * you got no space in @[$jsonQQ|@ and
+--    * you got no space in @[jsonQQ|@ and
 --    
 --    * no additional code after @|]@.
 --    
 --    The quasiquatation can also bind to variables like
 --    
---    > myCode = [$jsonQQ| {age: <|age|>, name: <|name|>} |]
+--    > myCode = [jsonQQ| {age: <|age|>, name: <|name|>} |]
 --    > where age = 34 :: Integer
 --    >       name = "Pelle"
 --    
@@ -25,17 +25,17 @@
 --
 --    You can also insert Haskell code: 
 --
---    > myCode = [$jsonQQ| {age: <|age + 34 :: Integer|>, name: <|map toUpper name|>} |]
+--    > myCode = [jsonQQ| {age: <|age + 34 :: Integer|>, name: <|map toUpper name|>} |]
 --    > where age = 34 :: Integer
 --    >       name = "Pelle"
 --    
 --    You can use a similar syntax if you want to insert a value of type JSValue like
 --    
---    > myCode = [$jsonQQ| {"age": <<age>>} |]
+--    > myCode = [jsonQQ| {"age": <<age>>} |]
 --    
 --    If you want to replace the name of the key in a hash you'll use the $-syntax:
 --    
---    > foo = [$jsonQQ| {$bar: 42} |]
+--    > foo = [jsonQQ| {$bar: 42} |]
 --    > bar = "age"
 --    
 
