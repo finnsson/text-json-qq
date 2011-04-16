@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts -XTemplateHaskell -XQuasiQuotes -XUndecidableInstances #-}
+{-# OPTIONS_GHC -XTemplateHaskell -XQuasiQuotes -XUndecidableInstances #-}
 
 -- | This package expose the function @jsonQQ@ that compile time converts json code into a @Text.JSON.JSValue@.
 --    @jsonQQ@ got the signature
@@ -60,7 +60,12 @@ import Text.ParserCombinators.Parsec.Error
 import Language.Haskell.Meta.Parse
 
 jsonQQ :: QuasiQuoter
-jsonQQ = QuasiQuoter { quoteExp = jsonExp, quotePat = jsonPat}
+jsonQQ = QuasiQuoter { 
+  quoteExp = jsonExp, 
+  quotePat = \s -> error "No quotePat defined for jsonQQ",
+  quoteType = \s -> error "No quoteType defined for jsonQQ",
+  quoteDec = \s -> error "No quoteDec defined for jsonQQ"
+}
 
 
 jsonExp :: String -> ExpQ
@@ -70,10 +75,6 @@ jsonExp txt =
     Right val -> return $ toExp val
   where
     parsed' = parse jpValue "txt" txt
-
-jsonPat :: String -> PatQ
-jsonPat s = undefined
-
 
 ----
 -- JSValue etc to ExpQ
