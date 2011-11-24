@@ -1,5 +1,5 @@
 name:                text-json-qq
-version:             0.4.0
+version:             0.4.1
 synopsis:            Json Quasiquatation for Haskell.
 
 -- A longer description of the package.
@@ -25,7 +25,12 @@ cabal-version:       >=1.6
 library
   hs-source-dirs: src
   exposed-modules: Text.JSON.QQ
-  build-depends: base >= 4.3 && < 5, json-qq, json, parsec >= 2 && < 3, template-haskell, haskell-src-meta >= 0.1.0
+  build-depends: base >= 4.3 && < 5, 
+                 json-qq == 0.4.1, 
+                 json, 
+                 parsec >= 2, 
+                 template-haskell, 
+                 haskell-src-meta >= 0.1.0
 
 source-repository head
   type:     git
