@@ -52,7 +52,7 @@ import Data.Maybe
 import Text.JSON
 import Text.JSON.Generic
 
-import JSON.QQ
+import Data.JSON.QQ
 
 import Data.Ratio
 import Text.ParserCombinators.Parsec
